@@ -2,59 +2,60 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+// Import Tabel kita
+import { Movie, columns } from "@/components/movie-table/columns"
+import { DataTable } from "@/components/movie-table/data-table"
 
 export default function Home() {
-  const [recommendations, setRecommendations] = useState<string[]>([])
+  // Ubah tipe datanya bukan string[] lagi, tapi Movie[]
+  const [recommendations, setRecommendations] = useState<Movie[]>([])
   const [loading, setLoading] = useState(false)
+  const [query, setQuery] = useState("")
 
-  // Fungsi untuk memanggil Backend Python
   const handleGetRecommendation = async () => {
+    if (!query) return alert("Ketik judul film dulu dong!")
+
     setLoading(true)
     try {
-      // ⚠️ PASTIKAN URL INI BENAR (Harus diakhiri /recommend?...)
-      // Ganti URL_PANJANG_KAMU dengan url dari Port 8000
-      const res = await fetch("https://animated-broccoli-gjppwjvrwq9f9rx9-8000.app.github.dev/recommend?movie_title=Avengers")
+      // GANTI URL INI DENGAN URL PUBLIC KAMU
+      const baseUrl = "https://animated-broccoli-gjppwjvrwq9f9rx9-8000.app.github.dev" 
+      const res = await fetch(`${baseUrl}/recommend?movie_title=${query}`)
       
       const data = await res.json()
-      
-      // CEK DATA DI CONSOLE (Biar kita tau isi aslinya apa)
-      console.log("Data dari Backend:", data)
-
-      // PERBAIKAN: Pakai "|| []" (Kalau undefined, ganti jadi array kosong)
-      setRecommendations(data.recommendations || []) 
-      
+      console.log("Data:", data)
+      setRecommendations(data.recommendations || [])
     } catch (error) {
-      console.error("Gagal mengambil data:", error)
-      alert("Ada error! Cek Console (F12) untuk detailnya.")
+      console.error(error)
+      alert("Gagal konek backend!")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex flex-col h-screen items-center justify-center gap-6 bg-slate-50">
-      <h1 className="text-4xl font-bold tracking-tight text-slate-900">
-        Movie Recommender AI 🎬
+    <div className="flex flex-col h-screen items-center justify-center gap-6 bg-slate-50 px-4">
+      <h1 className="text-4xl font-bold tracking-tight text-slate-900 text-center">
+        🎬 Movie Recommender Pro
       </h1>
       
-      <div className="flex gap-4">
-        {/* Tombol ini akan memicu fungsi di atas */}
+      <div className="flex w-full max-w-sm items-center space-x-2">
+        <Input 
+          type="text" 
+          placeholder="Ketik judul (Avengers, Horror, Love)..." 
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
         <Button onClick={handleGetRecommendation} disabled={loading}>
-          {loading ? "Sedang Mikir..." : "Rekomendasi Film Avengers"}
+          {loading ? "🔍..." : "Cari"}
         </Button>
       </div>
 
-      {/* Bagian untuk menampilkan hasil */}
-      {recommendations.length > 0 && (
-        <div className="p-4 border rounded-lg bg-white shadow-md w-full max-w-md">
-          <h3 className="font-bold mb-2">Hasil Rekomendasi:</h3>
-          <ul className="list-disc pl-5">
-            {recommendations.map((movie, index) => (
-              <li key={index} className="text-slate-700">{movie}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* TAMPILKAN TABEL DISINI */}
+      <div className="w-full max-w-2xl">
+         <DataTable columns={columns} data={recommendations} />
+      </div>
+
     </div>
   )
 }
