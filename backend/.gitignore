@@ -1,0 +1,12 @@
+# Folder Virtual Environment (JANGAN DICOMMIT!)
+venv/
+env/
+.env
+
+# Cache Python (File sampah hasil compile)
+__pycache__/
+*.py[cod]
+
+# Database lokal (kalau nanti pake SQLite)
+*.sqlite3
+*.db

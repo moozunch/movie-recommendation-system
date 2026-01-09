@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  # Service 1: Backend Python
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app  # Ini biar kalau ada perubahan, di docker ikut berubah (Hot Reload)
+
+  # Service 2: Frontend Next.js
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend  # Frontend nunggu backend siap dulu
