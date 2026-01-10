@@ -1,0 +1,40 @@
+name: CI/CD Pipeline 
+
+# Jadi kan ini CI/CD, kali ini untuk automation testing, supaya kalau di push dia otomatis check dulu ada nggak bug
+# Kapan robot ini bekerja?
+# Setiap kali ada 'push' ke branch 'main' atau 'master'
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  # Misi 1: Testing Backend
+  test-backend:
+    runs-on: ubuntu-latest # Robotnya pakai OS Ubuntu
+
+    steps:
+    # 1. Ambil kodingan kamu dari repo
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 2. Setup Docker di dalam robot GitHub
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    # 3. Nyalakan Docker Compose 
+    - name: Build and Run Docker
+      run: docker compose up -d --build
+
+    # 4. Tunggu sebentar biar server nyala sempurna 
+    - name: Sleep for 10 seconds
+      run: sleep 10
+
+    # 5. Jalankan Pytest 
+    - name: Run Backend Tests
+      run: docker compose exec -T backend pytest
+    
+    # 6. Matikan Docker setelah selesai
+    - name: Tear down
+      run: docker compose down

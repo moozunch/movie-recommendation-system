@@ -34,12 +34,33 @@ def read_root():
 # Ini endpoint pura-pura rekomendasi 
 @app.get("/recommend")
 def get_recommendation(movie_title: str):
-    # Logika bodoh-bodohan dulu
+    title_lower = movie_title.lower()
+    
+    # Data dummy tapi lebih kaya (List of Objects)
+    if "avengers" in title_lower or "marvel" in title_lower:
+        recs = [
+            {"title": "Iron Man", "genre": "Action", "rating": 8.5, "year": 2008},
+            {"title": "Thor: Ragnarok", "genre": "Action/Comedy", "rating": 7.9, "year": 2017},
+            {"title": "Spider-Man: No Way Home", "genre": "Action", "rating": 8.2, "year": 2021},
+        ]
+    elif "horror" in title_lower or "conjuring" in title_lower:
+        recs = [
+            {"title": "Hereditary", "genre": "Horror", "rating": 7.3, "year": 2018},
+            {"title": "The Conjuring", "genre": "Horror", "rating": 7.5, "year": 2013},
+            {"title": "Midsommar", "genre": "Horror", "rating": 7.1, "year": 2019},
+        ]
+    elif "love" in title_lower or "romance" in title_lower:
+        recs = [
+            {"title": "La La Land", "genre": "Romance/Musical", "rating": 8.0, "year": 2016},
+            {"title": "About Time", "genre": "Romance/Sci-Fi", "rating": 7.8, "year": 2013},
+        ]
+    else:
+        recs = [
+            {"title": "Inception", "genre": "Sci-Fi", "rating": 8.8, "year": 2010},
+            {"title": "Parasite", "genre": "Thriller", "rating": 8.6, "year": 2019},
+        ]
+
     return {
         "input_movie": movie_title,
-        "recommendations": [
-            "Film Mirip A",
-            "Film Mirip B",
-            "Film Mirip C"
-        ]
+        "recommendations": recs
     }
