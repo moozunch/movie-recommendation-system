@@ -2,7 +2,6 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 
-// Ini bentuk data kita dari Python tadi
 export type Movie = {
   title: string
   genre: string
@@ -13,7 +12,7 @@ export type Movie = {
 export const columns: ColumnDef<Movie>[] = [
   {
     accessorKey: "title",
-    header: "Judul Film",
+    header: "Movie Title", // English
   },
   {
     accessorKey: "genre",
@@ -21,14 +20,19 @@ export const columns: ColumnDef<Movie>[] = [
   },
   {
     accessorKey: "year",
-    header: "Tahun",
+    header: "Year", // English
   },
   {
     accessorKey: "rating",
     header: "Rating",
-    // Kita kasih style dikit biar angka rating ada di kanan
     cell: ({ row }) => {
-      return <div className="font-bold text-orange-600">{row.getValue("rating")} / 10</div>
+      // Color coded rating
+      const rating = parseFloat(row.getValue("rating"))
+      return (
+        <div className={`font-bold ${rating >= 8 ? "text-green-600" : "text-slate-600"}`}>
+          {rating.toFixed(1)} / 10
+        </div>
+      )
     },
   },
 ]

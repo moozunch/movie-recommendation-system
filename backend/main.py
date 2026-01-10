@@ -1,23 +1,11 @@
+import os
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# 2. Konfigurasi Izin Satpam
-# Kita izinkan localhost:3000 (Frontend) buat akses backend corsm, tapi karena ini pakai codespace dan alamat nggak pas di localhost dan berubah terus, jd di allow dulu semuanya
-# origins = [
-#     "http://localhost:3000",
-#     "http://127.0.0.1:3000",
-# ]
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=origins, # Daftar siapa yang boleh masuk
-#     allow_credentials=True,
-#     allow_methods=["*"],   # Boleh ngapain aja (GET, POST, dll)
-#     allow_headers=["*"],
-# )
-# IZINKAN SEMUA (WILDCARD)
-# Tanda "*" artinya: Siapa saja boleh masuk.
+# --- CONFIGURATION ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -26,41 +14,79 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ini endpoint untuk tes
+TMDB_TOKEN = os.getenv("TMDB_TOKEN")
+
+if not TMDB_TOKEN:
+    print("⚠️  WARNING: TMDB_TOKEN not found in .env file!")
+
+HEADERS = {
+    "Authorization": f"Bearer {TMDB_TOKEN}",
+    "accept": "application/json"
+}
+
+# --- HELPER FUNCTIONS ---
+
+async def search_movie_id(client, title):
+    """Search for movie ID by title on TMDB"""
+    url = f"https://api.themoviedb.org/3/search/movie?query={title}&language=en-US&page=1"
+    try:
+        response = await client.get(url, headers=HEADERS)
+        data = response.json()
+        if data['results']:
+            return data['results'][0]['id']
+    except Exception as e:
+        print(f"Error searching {title}: {e}")
+    return None
+
+async def get_tmdb_recommendations(client, movie_id):
+    """Get recommendations based on movie ID"""
+    url = f"https://api.themoviedb.org/3/movie/{movie_id}/recommendations?language=en-US&page=1"
+    try:
+        response = await client.get(url, headers=HEADERS)
+        data = response.json()
+        return data.get('results', [])
+    except Exception as e:
+        print(f"Error getting recs: {e}")
+        return []
+
+# --- API ENDPOINTS ---
+
 @app.get("/")
 def read_root():
-    return {"message": "Halo, ini Backend Python yang ngomong!"}
+    return {"message": "Movie Recommender API (TMDB) is Ready!"}
 
-# Ini endpoint pura-pura rekomendasi 
 @app.get("/recommend")
-def get_recommendation(movie_title: str):
-    title_lower = movie_title.lower()
+async def get_recommendation(title: str):
+    recommendations = []
     
-    # Data dummy tapi lebih kaya (List of Objects)
-    if "avengers" in title_lower or "marvel" in title_lower:
-        recs = [
-            {"title": "Iron Man", "genre": "Action", "rating": 8.5, "year": 2008},
-            {"title": "Thor: Ragnarok", "genre": "Action/Comedy", "rating": 7.9, "year": 2017},
-            {"title": "Spider-Man: No Way Home", "genre": "Action", "rating": 8.2, "year": 2021},
-        ]
-    elif "horror" in title_lower or "conjuring" in title_lower:
-        recs = [
-            {"title": "Hereditary", "genre": "Horror", "rating": 7.3, "year": 2018},
-            {"title": "The Conjuring", "genre": "Horror", "rating": 7.5, "year": 2013},
-            {"title": "Midsommar", "genre": "Horror", "rating": 7.1, "year": 2019},
-        ]
-    elif "love" in title_lower or "romance" in title_lower:
-        recs = [
-            {"title": "La La Land", "genre": "Romance/Musical", "rating": 8.0, "year": 2016},
-            {"title": "About Time", "genre": "Romance/Sci-Fi", "rating": 7.8, "year": 2013},
-        ]
-    else:
-        recs = [
-            {"title": "Inception", "genre": "Sci-Fi", "rating": 8.8, "year": 2010},
-            {"title": "Parasite", "genre": "Thriller", "rating": 8.6, "year": 2019},
-        ]
+    async with httpx.AsyncClient() as client:
+        # 1. Find the Movie ID
+        movie_id = await search_movie_id(client, title)
+        
+        if not movie_id:
+            return {
+                "input_movie": title,
+                "message": "Movie not found",
+                "recommendations": []
+            }
+        
+        # 2. Get Recommendations
+        tmdb_recs = await get_tmdb_recommendations(client, movie_id)
 
+        # 3. Format Data
+        for movie in tmdb_recs:
+            if movie.get('poster_path'): # Filter movies without posters
+                recommendations.append({
+                    "title": movie['title'],
+                    "genre": "Movie", # Simplified
+                    "year": int(movie['release_date'][:4]) if movie.get('release_date') else 0,
+                    "rating": movie['vote_average']
+                })
+    
+    # Sort by rating
+    recommendations = sorted(recommendations, key=lambda x: x['rating'], reverse=True)
+    
     return {
-        "input_movie": movie_title,
-        "recommendations": recs
+        "input_movie": title,
+        "recommendations": recommendations[:10]
     }

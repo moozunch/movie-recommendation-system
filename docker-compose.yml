@@ -5,7 +5,9 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "8000:7860"
+    env_file:
+      - ./backend/.env
     volumes:
       - ./backend:/app  # Ini biar kalau ada perubahan, di docker ikut berubah (Hot Reload)
 
