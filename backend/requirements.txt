@@ -14,3 +14,6 @@ uvicorn==0.40.0
 pytest
 httpx
 pytest-asyncio
+numpy
+pandas
+scikit-learn
