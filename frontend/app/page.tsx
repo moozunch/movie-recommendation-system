@@ -18,8 +18,7 @@ export default function Home() {
 
     setLoading(true)
     try {
-      // GANTI URL INI DENGAN URL PUBLIC KAMU
-      const baseUrl = "https://animated-broccoli-gjppwjvrwq9f9rx9-8000.app.github.dev" 
+      const baseUrl = "https://moozunch-movie-recommendation-backend.hf.space" 
       const res = await fetch(`${baseUrl}/recommend?movie_title=${query}`)
       
       const data = await res.json()
