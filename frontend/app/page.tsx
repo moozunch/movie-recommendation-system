@@ -32,6 +32,7 @@ export default function Home() {
       title: rec.title,
       year: rec.year,
       rating: rec.rating,
+      poster_path: rec.poster_path,
       genres: rec.genres || ["Movie"], // Default value
       reason: rec.reason,             // Ambil alasan AI
       match_score: rec.match_score    // Ambil score
@@ -131,33 +132,29 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen items-center py-20 gap-8 bg-black px-4">
+    <div className="flex flex-col min-h-screen items-center py-20 gap-8 bg-background px-4">
       {/* Header Section */}
-      <div className="text-center space-y-2">
+      <div className="prose prose-invert text-center space-y-2 font-sans">
         <div className="flex items-center justify-center gap-2 text-white">
           <Clapperboard className="h-10 w-10" />
-          <h1 className="text-4xl font-bold tracking-tight">
-            Movie Recommender
-          </h1>
+          <h1 className="text-4xl font-bold tracking-tight">Movie Recommender</h1>
         </div>
-        <p className="text-zinc-500">
-          Powered by AI & TMDB API
-        </p>
+        <p className="text-zinc-500">Powered by AI & TMDB API</p>
       </div>
       
       {/* Tabs Navigation */}
       <Tabs defaultValue="single" className="w-full max-w-4xl">
-        <TabsList className="grid w-full grid-cols-2 bg-zinc-900/50 border border-zinc-800">
+        <TabsList className="bg-zinc-900/60 border border-zinc-800 p-1 rounded-lg w-fit mx-auto">
           <TabsTrigger 
             value="single"
-            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white"
+            className="grow-0 shrink-0 basis-auto px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 data-[state=active]:bg-zinc-800/70 data-[state=active]:text-white"
           >
             <SearchIcon className="h-4 w-4 mr-2" />
             Single Search
           </TabsTrigger>
           <TabsTrigger 
             value="curate"
-            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white"
+            className="grow-0 shrink-0 basis-auto px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-200 data-[state=active]:bg-zinc-800/70 data-[state=active]:text-white"
           >
             <Sparkles className="h-4 w-4 mr-2" />
             Curate My Taste

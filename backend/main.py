@@ -120,6 +120,7 @@ async def initialize_ml_model():
                     'title': movie.get('title', ''),
                     'year': int(movie['release_date'][:4]) if movie.get('release_date') else 0,
                     'rating': movie.get('vote_average', 0),
+                    'poster_path': movie.get('poster_path'),
                     'overview': overview,
                     'genres': movie_genres,  # Simpan List Genre untuk alasan
                     'features': f"{genres_str} {overview}" 
@@ -226,6 +227,7 @@ async def get_multi_movie_recommendations(profile: UserTasteProfile):
             "year": int(candidate['year']),
             "rating": float(candidate['rating']),
             "genres": candidate['genres'], # Kirim list genre ke frontend
+            "poster_path": candidate.get('poster_path'),
             "reason": reason, # <--- INI ALASANNYA
             "match_score": f"{int(similarity_scores[idx] * 100)}%" 
         })

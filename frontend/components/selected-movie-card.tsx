@@ -1,6 +1,6 @@
 "use client"
 
-import { X } from "lucide-react"
+import { X, Star } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
@@ -19,7 +19,7 @@ interface SelectedMovieCardProps {
 
 export function SelectedMovieCard({ movie, onRemove }: SelectedMovieCardProps) {
   return (
-    <Card className="relative flex items-center gap-3 p-3 bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-colors group">
+    <Card className="relative w-full flex-row items-start gap-4 p-3 bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-colors group overflow-hidden rounded-lg">
       {/* Poster */}
       <div className="flex-shrink-0 w-12 h-16 rounded overflow-hidden bg-zinc-800">
         {movie.poster_path ? (
@@ -49,19 +49,21 @@ export function SelectedMovieCard({ movie, onRemove }: SelectedMovieCardProps) {
 
       {/* Movie Info */}
       <div className="flex-1 min-w-0">
-        <h4 className="text-sm font-medium text-white truncate">
+        <h4 className="text-sm font-semibold text-white break-words line-clamp-2">
           {movie.title}
         </h4>
-        <div className="flex items-center gap-2 mt-1">
+        {/* Fixed rating row under title */}
+        <div className="mt-1 flex items-center gap-2">
+          {movie.vote_average > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
+              <Star className="w-3.5 h-3.5 fill-current text-yellow-400" />
+              {movie.vote_average.toFixed(1)}
+            </span>
+          )}
           {movie.year && (
             <Badge variant="secondary" className="text-xs bg-zinc-800 text-zinc-400 hover:bg-zinc-800">
               {movie.year}
             </Badge>
-          )}
-          {movie.vote_average > 0 && (
-            <span className="text-xs text-zinc-500">
-              ⭐ {movie.vote_average.toFixed(1)}
-            </span>
           )}
         </div>
       </div>
@@ -69,7 +71,7 @@ export function SelectedMovieCard({ movie, onRemove }: SelectedMovieCardProps) {
       {/* Remove Button */}
       <button
         onClick={() => onRemove(movie.id)}
-        className="absolute -top-2 -right-2 flex items-center justify-center w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 hover:bg-red-600 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+        className="absolute top-2 right-2 z-10 flex items-center justify-center w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 hover:bg-red-600 hover:text-white transition-all opacity-0 group-hover:opacity-100"
         aria-label="Remove movie"
       >
         <X className="h-3 w-3" />
