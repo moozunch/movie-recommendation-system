@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 
 // Ganti URL ini jika environment berubah
-const BACKEND_URL = "https://animated-broccoli-gjppwjvrwq9f9rx9-8000.app.github.dev"
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://backend:7860"
 const MAX_SELECTIONS = 3
 
 export default function Home() {

@@ -27,7 +27,8 @@ interface MovieSearchProps {
   className?: string
 }
 
-const BACKEND_URL = "https://animated-broccoli-gjppwjvrwq9f9rx9-8000.app.github.dev"
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 
+  (typeof window !== 'undefined' ? 'http://localhost:8000' : 'http://backend:7860')
 
 export function MovieSearch({
   onSelectMovie,
