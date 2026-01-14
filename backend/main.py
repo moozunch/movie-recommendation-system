@@ -11,8 +11,15 @@ import smtplib
 from email.message import EmailMessage
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize ML model on startup (replaces deprecated on_event)
+    await initialize_ml_model()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 # --- CONFIGURATION ---
 app.add_middleware(
@@ -147,9 +154,7 @@ async def initialize_ml_model():
     
     print(f"AI Ready: Loaded {len(movies_df)} movies with genres.")
 
-@app.on_event("startup")
-async def startup_event():
-    await initialize_ml_model()
+# Lifespan handles initialization; remove deprecated on_event usage
 
 # --- ENDPOINTS ---
 @app.get("/")
