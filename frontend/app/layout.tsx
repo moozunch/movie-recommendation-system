@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "find.my.movie",
+  title: "Movie Recommender - Moozunch",
   description: "find your favorite movie based on your likes",
 };
 

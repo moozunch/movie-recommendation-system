@@ -1,6 +1,10 @@
 import os
+import asyncio
 import httpx
-from fastapi import FastAPI
+import numpy as np
+import pandas as pd
+from typing import List
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import smtplib
@@ -72,7 +76,7 @@ async def fetch_tmdb_movie_details(client, title: str):
     # 1. Cari ID Film
     search_url = f"https://api.themoviedb.org/3/search/movie?query={title}&language=en-US&page=1"
     try:
-        response = await client.get(url, headers=HEADERS)
+        response = await client.get(search_url, headers=HEADERS)
         data = response.json()
         return data.get('results', [])
     except Exception as e:
@@ -139,43 +143,99 @@ async def initialize_ml_model():
 # --- ENDPOINTS ---
 @app.get("/")
 def read_root():
-    return {"message": "Movie Recommender API (TMDB) is Ready!"}
+    return {"message": "Explainable AI Movie Recommender Ready"}
 
-@app.get("/recommend")
-async def get_recommendation(title: str):
-    recommendations = []
-    
+
+@app.get("/search")
+async def search_movies(query: str):
+    """Proxy simple search to TMDB and limit results to 5."""
     async with httpx.AsyncClient() as client:
-        # 1. Find the Movie ID
-        movie_id = await search_movie_id(client, title)
-        
-        if not movie_id:
-            return {
-                "input_movie": title,
-                "message": "Movie not found",
-                "recommendations": []
-            }
-        
-        # 2. Get Recommendations
-        tmdb_recs = await get_tmdb_recommendations(client, movie_id)
+        try:
+            url = f"https://api.themoviedb.org/3/search/movie?query={query}&language=en-US&page=1"
+            resp = await client.get(url, headers=HEADERS, timeout=10.0)
+            data = resp.json()
+            results = data.get("results", [])[:5]
+            return {"results": results}
+        except Exception as e:
+            print(f"Search error: {e}")
+            return {"results": []}
 
-        # 3. Format Data
-        for movie in tmdb_recs:
-            if movie.get('poster_path'): # Filter movies without posters
-                recommendations.append({
-                    "title": movie['title'],
-                    "genre": "Movie", # Simplified
-                    "year": int(movie['release_date'][:4]) if movie.get('release_date') else 0,
-                    "rating": movie['vote_average']
-                })
-    
-    # Sort by rating
-    recommendations = sorted(recommendations, key=lambda x: x['rating'], reverse=True)
-    
-    return {
-        "user_profile": found_titles,
-        "recommendations": recommendations
-    }
+@app.post("/recommend/v2")
+async def recommend_v2(payload: UserTasteProfile):
+    """Recommend similar movies using local TF–IDF vectors.
+    Falls back to TMDB search if local titles are not found.
+    """
+    global movies_df, tfidf_matrix, vectorizer
+
+    if movies_df is None or tfidf_matrix is None or vectorizer is None:
+        raise HTTPException(status_code=503, detail="Model not initialized.")
+
+    titles = [t for t in payload.titles if t and t.strip()]
+    if not titles:
+        raise HTTPException(status_code=404, detail="No movies found.")
+
+    # Find indices for provided titles in local dataset
+    mask = movies_df["title"].isin(titles)
+    selected_indices = list(np.where(mask)[0])
+
+    input_genres: List[str] = []
+    if not selected_indices:
+        # Attempt dynamic fetch to build a synthetic vector from TMDB details
+        async with httpx.AsyncClient() as client:
+            details = await fetch_tmdb_movie_details(client, titles[0])
+        if not details:
+            raise HTTPException(status_code=404, detail="No movies found.")
+        candidate = details[0]
+        movie_genres = [GENRE_MAP.get(gid) for gid in candidate.get('genre_ids', []) if gid in GENRE_MAP]
+        genres_str = ' '.join([g for g in movie_genres if g])
+        overview = candidate.get('overview', '')
+        features_text = f"{genres_str} {overview}".strip()
+        if not features_text:
+            raise HTTPException(status_code=404, detail="No movies found.")
+        user_vector = vectorizer.transform([features_text])  # csr matrix
+        input_genres = [g for g in movie_genres if g]
+    else:
+        # Mean on sparse returns np.matrix; convert to 2D ndarray
+        user_vector = tfidf_matrix[selected_indices].mean(axis=0)
+        user_vector = np.asarray(user_vector).reshape(1, -1)
+        # Collect input genres from local dataset
+        try:
+            input_genres = sorted({g for idx in selected_indices for g in (movies_df.iloc[idx]["genres"] or []) if g})
+        except Exception:
+            input_genres = []
+    sims = cosine_similarity(user_vector, tfidf_matrix).ravel()
+
+    # Rank and prepare recommendations (exclude input titles)
+    ranked = np.argsort(-sims)
+    recs = []
+    for idx in ranked:
+        title = movies_df.iloc[idx]["title"]
+        if title in titles:
+            continue
+        row = movies_df.iloc[idx]
+        # similarity score to percentage (0-100)
+        score_pct = max(0.0, min(1.0, float(sims[idx]))) * 100.0
+        # overlap genres reasoning
+        row_genres = [g for g in (row["genres"] if "genres" in row else []) if g]
+        overlap = sorted(list(set(row_genres) & set(input_genres)))
+        reason_text = (
+            f"Similar genres: {', '.join(overlap)}" if overlap else 
+            "High content similarity based on genres and overview"
+        )
+        recs.append({
+            "id": int(row["id"]) if "id" in row else idx,
+            "title": title,
+            "year": int(row["year"]) if "year" in row and row["year"] else 0,
+            "rating": float(row["rating"]) if "rating" in row else 0.0,
+            "poster_path": row.get("poster_path"),
+            "genres": row_genres,
+            "reason": reason_text,
+            "match_score": f"{int(round(score_pct))}%",
+        })
+        if len(recs) >= 10:
+            break
+
+    return {"user_profile": titles, "recommendations": recs}
 
 
 def _send_feedback_email(sender_email: str, message: str) -> dict:

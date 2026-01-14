@@ -8,6 +8,11 @@ export default defineConfig({
     globals: true,
     css: true,
     include: ['tests/unit/**/*.test.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reportsDirectory: 'coverage',
+      reporter: ['text', 'html', 'lcov']
+    },
   },
   resolve: {
     alias: {
