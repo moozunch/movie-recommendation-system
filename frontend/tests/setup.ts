@@ -7,5 +7,5 @@ class ResizeObserverMock {
 	disconnect() {}
 }
 
-// @ts-expect-error - attach to global for tests
-global.ResizeObserver = global.ResizeObserver || ResizeObserverMock;
+// Attach to global in test env without TypeScript suppression
+(globalThis as any).ResizeObserver = (globalThis as any).ResizeObserver || ResizeObserverMock;

@@ -1,10 +1,6 @@
 import os
 import httpx
-import numpy as np
-import pandas as pd
-import asyncio
-from typing import List, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import smtplib
@@ -24,13 +20,17 @@ app = FastAPI(lifespan=lifespan)
 # --- CONFIGURATION ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 TMDB_TOKEN = os.getenv("TMDB_TOKEN")
+
+if not TMDB_TOKEN:
+    print("⚠️  WARNING: TMDB_TOKEN not found in .env file!")
+
 HEADERS = {
     "Authorization": f"Bearer {TMDB_TOKEN}",
     "accept": "application/json"
@@ -72,29 +72,9 @@ async def fetch_tmdb_movie_details(client, title: str):
     # 1. Cari ID Film
     search_url = f"https://api.themoviedb.org/3/search/movie?query={title}&language=en-US&page=1"
     try:
-        resp = await client.get(search_url, headers=HEADERS, timeout=10.0)
-        data = resp.json()
-        if not data.get('results'):
-            return None
-        
-        movie = data['results'][0]
-        movie_id = movie['id']
-        
-        # 2. Ambil Detail
-        detail_url = f"https://api.themoviedb.org/3/movie/{movie_id}?language=en-US"
-        detail_resp = await client.get(detail_url, headers=HEADERS, timeout=10.0)
-        detail_data = detail_resp.json()
-        
-        genres_list = [g['name'] for g in detail_data.get('genres', [])]
-        genres_str = ' '.join(genres_list)
-        overview = detail_data.get('overview', '')
-        
-        return {
-            'id': movie_id,
-            'title': detail_data.get('title', title),
-            'genres': genres_list, # Simpan list genre asli
-            'features': f"{genres_str} {overview}"
-        }
+        response = await client.get(url, headers=HEADERS)
+        data = response.json()
+        return data.get('results', [])
     except Exception as e:
         print(f"Error fetching dynamic movie {title}: {e}")
         return None
@@ -159,91 +139,39 @@ async def initialize_ml_model():
 # --- ENDPOINTS ---
 @app.get("/")
 def read_root():
-    return {"message": "Explainable AI Movie Recommender Ready"}
+    return {"message": "Movie Recommender API (TMDB) is Ready!"}
 
-@app.get("/search")
-async def search_movies(query: str):
-    # (Sama seperti sebelumnya)
-    async with httpx.AsyncClient() as client:
-        url = f"https://api.themoviedb.org/3/search/movie?query={query}&language=en-US&page=1"
-        r = await client.get(url, headers=HEADERS)
-        data = r.json()
-        return {"results": data.get('results', [])[:5]}
-
-@app.post("/recommend/v2")
-async def get_multi_movie_recommendations(profile: UserTasteProfile):
-    if movies_df is None or vectorizer is None:
-        raise HTTPException(status_code=503, detail="Server starting up...")
-
-    input_vectors = []
-    found_titles = []
-    user_genres_pool = set() # Kumpulan semua genre dari film favorit user
-    
-    async with httpx.AsyncClient() as client:
-        for title in profile.titles:
-            # Cari di DB Lokal
-            match = movies_df[movies_df['title'].str.lower() == title.lower()]
-            
-            if not match.empty:
-                idx = match.index[0]
-                input_vectors.append(tfidf_matrix[idx].toarray())
-                found_titles.append(match.iloc[0]['title'])
-                # Kumpulkan genre
-                for g in match.iloc[0]['genres']:
-                    user_genres_pool.add(g)
-            else:
-                # Cari di TMDB Live
-                details = await fetch_tmdb_movie_details(client, title)
-                if details:
-                    vector = vectorizer.transform([details['features']]).toarray()
-                    input_vectors.append(vector)
-                    found_titles.append(details['title'])
-                    for g in details['genres']:
-                        user_genres_pool.add(g)
-
-    if not input_vectors:
-        raise HTTPException(status_code=404, detail="No movies found.")
-
-    # Hitung Centroid
-    input_matrix = np.vstack(input_vectors)
-    user_centroid = np.mean(input_matrix, axis=0).reshape(1, -1)
-    
-    # Hitung Similarity
-    similarity_scores = cosine_similarity(user_centroid, tfidf_matrix)[0]
-    top_indices = similarity_scores.argsort()[::-1]
-    
+@app.get("/recommend")
+async def get_recommendation(title: str):
     recommendations = []
-    for idx in top_indices:
-        candidate = movies_df.iloc[idx]
-        if candidate['title'] in found_titles:
-            continue
-            
-        if len(recommendations) >= 10:
-            break
-            
-        # --- LOGIC "THOUGHT PROCESS" (EXPLAINABILITY) ---
-        # Cari irisan genre antara user profile dan kandidat
-        candidate_genres = set(candidate['genres'])
-        common_genres = list(user_genres_pool.intersection(candidate_genres))
+    
+    async with httpx.AsyncClient() as client:
+        # 1. Find the Movie ID
+        movie_id = await search_movie_id(client, title)
         
-        reason = "Recommended based on overall plot similarity."
-        if common_genres:
-            # Ambil maksimal 3 genre yang sama biar gak kepanjangan
-            top_common = common_genres[:3] 
-            reason = f"Matches your taste in {', '.join(top_common)}."
-        elif float(similarity_scores[idx]) > 0.4:
-            reason = "High plot similarity with your selected movies."
-            
-        recommendations.append({
-            "title": candidate['title'],
-            "year": int(candidate['year']),
-            "rating": float(candidate['rating']),
-            "genres": candidate['genres'], # Kirim list genre ke frontend
-            "poster_path": candidate.get('poster_path'),
-            "reason": reason, # <--- INI ALASANNYA
-            "match_score": f"{int(similarity_scores[idx] * 100)}%" 
-        })
+        if not movie_id:
+            return {
+                "input_movie": title,
+                "message": "Movie not found",
+                "recommendations": []
+            }
+        
+        # 2. Get Recommendations
+        tmdb_recs = await get_tmdb_recommendations(client, movie_id)
 
+        # 3. Format Data
+        for movie in tmdb_recs:
+            if movie.get('poster_path'): # Filter movies without posters
+                recommendations.append({
+                    "title": movie['title'],
+                    "genre": "Movie", # Simplified
+                    "year": int(movie['release_date'][:4]) if movie.get('release_date') else 0,
+                    "rating": movie['vote_average']
+                })
+    
+    # Sort by rating
+    recommendations = sorted(recommendations, key=lambda x: x['rating'], reverse=True)
+    
     return {
         "user_profile": found_titles,
         "recommendations": recommendations
