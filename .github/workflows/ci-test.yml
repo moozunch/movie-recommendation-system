@@ -41,3 +41,25 @@ jobs:
     # 6. Matikan Docker setelah selesai
     - name: Tear down
       run: docker compose down
+
+  # Misi 2: Testing Frontend (Unit - Vitest)
+  test-frontend-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend unit tests (Vitest)
+        working-directory: frontend
+        env:
+          CI: true
+        run: npm test -- --coverage --run
