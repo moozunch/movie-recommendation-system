@@ -3,6 +3,8 @@ venv/
 env/
 .env
 
+.pytest_cache
+
 # Cache Python (File sampah hasil compile)
 __pycache__/
 *.py[cod]

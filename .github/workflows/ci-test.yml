@@ -1,5 +1,12 @@
 name: CI/CD Pipeline 
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 # Jadi kan ini CI/CD, kali ini untuk automation testing, supaya kalau di push dia otomatis check dulu ada nggak bug
 # Kapan robot ini bekerja?
 # Setiap kali ada 'push' ke branch 'main' atau 'master'
@@ -13,6 +20,7 @@ jobs:
   # Misi 1: Testing Backend
   test-backend:
     runs-on: ubuntu-latest # Robotnya pakai OS Ubuntu
+    timeout-minutes: 20
 
     steps:
     # 1. Ambil kodingan kamu dari repo
@@ -28,16 +36,60 @@ jobs:
 
     # 3. Nyalakan Docker Compose 
     - name: Build and Run Docker
-      run: docker compose up -d --build
+      run: docker compose up -d --build backend
 
-    # 4. Tunggu sebentar biar server nyala sempurna 
-    - name: Sleep for 10 seconds
-      run: sleep 10
+    # 4. Tunggu sampai container backend benar-benar running
+    - name: Wait for backend container
+      shell: bash
+      run: |
+        for i in {1..30}; do
+          RUNNING=$(docker compose ps --services --status running | grep -c "^backend$");
+          if [[ "$RUNNING" -ge 1 ]]; then
+            echo "Backend is running";
+            break;
+          fi;
+          echo "Waiting for backend...";
+          sleep 2;
+        done
+        docker compose ps
 
     # 5. Jalankan Pytest 
     - name: Run Backend Tests
-      run: docker compose exec -T backend pytest
+      run: docker compose run --rm backend pytest
     
     # 6. Matikan Docker setelah selesai
     - name: Tear down
       run: docker compose down
+
+  # Misi 2: Testing Frontend (Unit - Vitest)
+  test-frontend-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend unit tests (Vitest)
+        working-directory: frontend
+        env:
+          CI: true
+        run: npm test -- --coverage --run
+
+  # Aggregator job to depend on all checks
+  all-checks:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend-unit]
+    steps:
+      - name: All unit tests passed
+        run: echo "Backend + Frontend unit tests succeeded"
